@@ -1,0 +1,286 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>برنامه روزانه</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+/* Layout: one narrow column. Top: today's date. Middle: ask plan -> done? -> list. Bottom: finish button that swaps to the day report. */
+:root {
+  --bg: #EEF2F4;
+  --surface: #FFFFFF;
+  --line: #D5DDE2;
+  --fg: #14202B;
+  --muted: #55656F;
+  --accent: #1B6B58;
+  --accent-fg: #FFFFFF;
+  --accent-soft: #DCEFE8;
+  --pending: #A8501C;
+  --pending-soft: #F8E6DA;
+  --font-body: "Vazirmatn", Tahoma, "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1519; --surface: #172127; --line: #2A3841; --fg: #E6EDF1; --muted: #93A3AD;
+    --accent: #4FC3A1; --accent-fg: #07201A; --accent-soft: #173A31;
+    --pending: #F0A070; --pending-soft: #3A2619;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1519; --surface: #172127; --line: #2A3841; --fg: #E6EDF1; --muted: #93A3AD;
+  --accent: #4FC3A1; --accent-fg: #07201A; --accent-soft: #173A31;
+  --pending: #F0A070; --pending-soft: #3A2619;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.7;
+  padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+header { display: flex; flex-direction: column; gap: 2px; }
+h1 { margin: 0; font-size: 1.6rem; font-weight: 800; text-wrap: balance; }
+.date { color: var(--muted); font-size: .95rem; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+label.q { font-weight: 700; }
+input[type="text"] {
+  width: 100%; font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+}
+input[type="text"]::placeholder { color: var(--muted); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+legend { font-weight: 700; padding: 0; margin-bottom: 8px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label {
+  display: block; text-align: center; padding: 9px 10px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); cursor: pointer; font-weight: 500;
+}
+.seg input:checked + label.yes { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.seg input:checked + label.no { background: var(--pending-soft); border-color: var(--pending); color: var(--pending); font-weight: 700; }
+.seg input:focus-visible + label { outline: 3px solid var(--accent); outline-offset: 2px; }
+button {
+  font: inherit; font-weight: 700; cursor: pointer; border-radius: 8px; padding: 10px 16px;
+  border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg);
+}
+button.ghost { background: transparent; color: var(--fg); border-color: var(--line); font-weight: 500; }
+button:disabled { opacity: .5; cursor: default; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.row > * { flex: 1 1 140px; }
+h2 { margin: 0; font-size: 1.05rem; font-weight: 700; display: flex; justify-content: space-between; gap: 8px; }
+h2 span { color: var(--muted); font-weight: 500; font-size: .9rem; }
+ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); min-width: 0; }
+li:first-child { border-top: 0; }
+li .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+li.done .t { color: var(--muted); text-decoration: line-through; }
+.badge { font-size: .8rem; font-weight: 700; padding: 1px 10px; border-radius: 99px; white-space: nowrap; }
+.badge.yes { background: var(--accent-soft); color: var(--accent); }
+.badge.no { background: var(--pending-soft); color: var(--pending); }
+li button { padding: 4px 10px; font-size: .85rem; font-weight: 500; }
+.empty { color: var(--muted); margin: 0; }
+.bar { height: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 99px; overflow: hidden; }
+.bar > div { height: 100%; background: var(--accent); width: 0; transition: width .4s; }
+.big { font-size: 2rem; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.big small { font-size: 1rem; font-weight: 500; color: var(--muted); }
+.mark { font-weight: 800; }
+.mark.yes { color: var(--accent); }
+.mark.no { color: var(--pending); }
+@media (prefers-reduced-motion: reduce) { .bar > div { transition: none; } }
+</style>
+
+<main>
+  <header>
+    <h1>برنامه روزانه</h1>
+    <div class="date" id="date"></div>
+  </header>
+
+  <section id="entry" class="panel-wrap" style="display:flex;flex-direction:column;gap:20px">
+    <form class="panel" id="form" autocomplete="off">
+      <div>
+        <label class="q" for="title">برنامه‌ات چیه؟</label>
+        <input type="text" id="title" placeholder="مثلاً: خواندن فصل ۳ ماشین لرنینگ" maxlength="200">
+      </div>
+      <fieldset>
+        <legend>انجامش دادی؟</legend>
+        <div class="seg">
+          <input type="radio" name="done" id="d-yes" value="yes">
+          <label class="yes" for="d-yes">بله، انجام شد</label>
+          <input type="radio" name="done" id="d-no" value="no" checked>
+          <label class="no" for="d-no">نه، هنوز نه</label>
+        </div>
+      </fieldset>
+      <button type="submit" id="add">ثبت و برنامه بعدی</button>
+    </form>
+
+    <div class="panel">
+      <h2>کارهای امروز <span id="count"></span></h2>
+      <ul id="list"></ul>
+      <p class="empty" id="none">هنوز کاری ثبت نکردی. برنامه‌ی اول را بالا بنویس.</p>
+    </div>
+
+    <button type="button" id="finish">پایان روز و نمایش گزارش</button>
+  </section>
+
+  <section id="report" style="display:none;flex-direction:column;gap:20px">
+    <div class="panel">
+      <div class="big"><span id="r-done">0</span> <small>از</small> <span id="r-total">0</span> <small>کار انجام شد</small></div>
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="r-bar"><div id="r-fill"></div></div>
+    </div>
+    <div class="panel">
+      <h2>انجام‌شده‌ها <span id="r-done-n"></span></h2>
+      <ul id="r-done-list"></ul>
+    </div>
+    <div class="panel">
+      <h2>انجام‌نشده‌ها <span id="r-open-n"></span></h2>
+      <ul id="r-open-list"></ul>
+    </div>
+    <div class="row">
+      <button type="button" class="ghost" id="back">برگشت و ویرایش</button>
+      <button type="button" class="ghost" id="reset">شروع روز جدید</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var KEY = "daily-plan-v1";
+  var today = new Date();
+  var dayKey = today.getFullYear() + "-" + (today.getMonth() + 1) + "-" + today.getDate();
+  var state = { day: dayKey, tasks: [], nextId: 1 };
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) {
+        var s = JSON.parse(raw);
+        if (s && s.day === dayKey && Array.isArray(s.tasks)) state = s;
+      }
+    } catch (e) {}
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var dateEl = $("date");
+  try {
+    dateEl.textContent = today.toLocaleDateString("fa-IR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  } catch (e) { dateEl.textContent = today.toDateString(); }
+
+  function fa(n) {
+    try { return Number(n).toLocaleString("fa-IR"); } catch (e) { return String(n); }
+  }
+
+  function item(t, withActions) {
+    var li = document.createElement("li");
+    if (t.done) li.className = "done";
+    var mark = document.createElement("span");
+    mark.className = "mark " + (t.done ? "yes" : "no");
+    mark.textContent = t.done ? "✓" : "✗";
+    var text = document.createElement("span");
+    text.className = "t";
+    text.textContent = t.title;
+    li.appendChild(mark);
+    li.appendChild(text);
+    if (withActions) {
+      var tog = document.createElement("button");
+      tog.type = "button"; tog.className = "ghost";
+      tog.textContent = t.done ? "برگردان" : "انجام شد";
+      tog.addEventListener("click", function () { t.done = !t.done; save(); render(); });
+      var del = document.createElement("button");
+      del.type = "button"; del.className = "ghost";
+      del.textContent = "حذف";
+      del.setAttribute("aria-label", "حذف " + t.title);
+      del.addEventListener("click", function () {
+        state.tasks = state.tasks.filter(function (x) { return x.id !== t.id; });
+        save(); render();
+      });
+      li.appendChild(tog);
+      li.appendChild(del);
+    }
+    return li;
+  }
+
+  function fill(ul, tasks, withActions, emptyText) {
+    ul.textContent = "";
+    if (!tasks.length) {
+      var li = document.createElement("li");
+      li.className = "empty";
+      li.textContent = emptyText;
+      ul.appendChild(li);
+      return;
+    }
+    tasks.forEach(function (t) { ul.appendChild(item(t, withActions)); });
+  }
+
+  function render() {
+    var list = $("list");
+    fill(list, state.tasks, true, "");
+    $("none").hidden = state.tasks.length > 0;
+    list.hidden = state.tasks.length === 0;
+    var done = state.tasks.filter(function (t) { return t.done; }).length;
+    $("count").textContent = state.tasks.length ? fa(done) + " از " + fa(state.tasks.length) + " انجام شد" : "";
+    $("finish").disabled = state.tasks.length === 0;
+  }
+
+  function renderReport() {
+    var doneT = state.tasks.filter(function (t) { return t.done; });
+    var openT = state.tasks.filter(function (t) { return !t.done; });
+    $("r-done").textContent = fa(doneT.length);
+    $("r-total").textContent = fa(state.tasks.length);
+    var pct = state.tasks.length ? Math.round(doneT.length / state.tasks.length * 100) : 0;
+    $("r-fill").style.width = pct + "%";
+    $("r-bar").setAttribute("aria-valuenow", String(pct));
+    $("r-done-n").textContent = fa(doneT.length);
+    $("r-open-n").textContent = fa(openT.length);
+    fill($("r-done-list"), doneT, false, "امروز هیچ کاری انجام نشده.");
+    fill($("r-open-list"), openT, false, "همه‌ی کارها انجام شد.");
+  }
+
+  function show(which) {
+    $("entry").style.display = which === "entry" ? "flex" : "none";
+    $("report").style.display = which === "report" ? "flex" : "none";
+    window.scrollTo(0, 0);
+  }
+
+  $("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var title = $("title").value.trim();
+    if (!title) { $("title").focus(); return; }
+    var done = document.querySelector('input[name="done"]:checked').value === "yes";
+    state.tasks.push({ id: state.nextId++, title: title, done: done });
+    save();
+    $("title").value = "";
+    $("d-no").checked = true;
+    render();
+    $("title").focus();
+  });
+
+  $("finish").addEventListener("click", function () { save(); renderReport(); show("report"); });
+  $("back").addEventListener("click", function () { show("entry"); });
+  $("reset").addEventListener("click", function () {
+    if ($("reset").dataset.armed === "1") {
+      state = { day: dayKey, tasks: [], nextId: 1 };
+      save(); render(); show("entry");
+      $("reset").dataset.armed = "0";
+      $("reset").textContent = "شروع روز جدید";
+    } else {
+      $("reset").dataset.armed = "1";
+      $("reset").textContent = "مطمئنی؟ همه‌ی کارها پاک می‌شوند";
+    }
+  });
+
+  load();
+  document.documentElement.setAttribute("dir", "rtl");
+  document.documentElement.setAttribute("lang", "fa");
+  render();
+})();
+</script>
+
+</body></html>
